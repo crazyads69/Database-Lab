@@ -1,0 +1,160 @@
+-- Họ và tên: Lê Minh Trí
+-- MSSV: 22521543
+
+-- Câu 1: Tạo ra cơ sở dữ liệu QLVX và các quan hệ dựa trên các dữ liệu được mô tả như trên, khai báo các khóa chính và khóa ngoại của các quan hệ.
+
+CREATE DATABASE QLVX;
+USE QLVX;
+
+set dateformat dmy
+
+CREATE TABLE XE(
+    MAXE CHAR(3) PRIMARY KEY,
+    BIENKS CHAR(9),
+    MATUYEN CHAR(4),
+    SOGHET1 INT,
+    SOGHET2 INT,
+)
+
+CREATE TABLE TUYEN(
+    MATUYEN CHAR(4) PRIMARY KEY, 
+    BENDAU NVARCHAR(3),
+    BENCUOI NVARCHAR(3),
+    GIATUYEN MONEY,
+    NGXB SMALLDATETIME,
+    TGDK INT
+)
+
+
+CREATE TABLE KHACH(
+    MAHK CHAR(4) PRIMARY KEY,
+    TENHK NVARCHAR(30),
+    GIOITINH NVARCHAR(3),
+    CCCD CHAR(12)
+)
+
+CREATE TABLE VEXE(
+    MATUYEN CHAR(4) NOT NULL FOREIGN KEY REFERENCES TUYEN(MATUYEN),
+    MAHK CHAR(4) NOT NULL FOREIGN KEY REFERENCES KHACH(MAHK),
+    NGMUA SMALLDATETIME NOT NULL,
+    GIAVE MONEY,
+    PRIMARY KEY (MATUYEN, MAHK, NGMUA),
+)
+
+
+-- Câu 2: Nhập dữ liệu như đề bài – dữ liệu có thể không có dấu tiếng Việt.
+
+-- INSERT XE 
+
+INSERT INTO XE VALUES('X01','52SH-4393','TSD1' ,20, 20)
+INSERT INTO XE VALUES ('X02','59SG-7247','TPS1',36,36)
+INSERT INTO XE VALUES('X03','55BA-6850','TND1',15,15)
+INSERT INTO XE VALUES('X04','49LD-7234','TND2',25,24)
+INSERT INTO XE VALUES('X05', '86BT-2365','TSD2',36,32)
+INSERT INTO XE VALUES('X06', '53BB-2146',NULL, 36 ,30)
+
+-- INSERT KHACH
+
+INSERT INTO KHACH (MAHK, TENHK, GIOITINH, CCCD)
+VALUES
+    ('KH01', 'Nguyễn Văn An', 'Nam', '001099458796'),
+    ('KH02', 'Nguyễn Thị Bình', 'Nữ', '034182653421'),
+    ('KH03', 'Lê Kim Cúc', 'Nữ', '058301489045'),
+    ('KH04', 'Trần Văn Dương', 'Nam', '068203435521'),
+    ('KH05', 'Lê Quang Định', 'Nam', '079204412378'),
+    ('KH06', 'Hoàng Thị Giang', 'Nữ', '079305223678');
+
+-- INSERT TUYEN
+
+INSERT INTO TUYEN (MATUYEN, BENDAU, BENCUOI, GIATUYEN, NGXB, TGDK)
+VALUES
+    ('TSD1', 'SG', 'DL', 210000, '26/12/2022', 6),
+    ('TPS1', 'PT', 'SG', 120000, '04/08/2023', 4),
+    ('TND1', 'NT', 'DNG', 225000, '02/01/2023', 7),
+    ('TND2', 'NT', 'DL', 205000, '02/01/2023', 7),
+    ('TSD2', 'SG', 'DNG', 200000, '26/12/2022', 6),
+    ('TND3', 'NT', 'DN', 195000, '01/08/2023', 5);
+
+-- INSERT VEXE
+
+INSERT INTO VEXE (MATUYEN, MAHK, NGMUA, GIAVE)
+VALUES
+    ('TSD1', 'KH01', '25/12/2022', 210000),
+    ('TPS1', 'KH02', '04/08/2023', 144000),
+    ('TND1', 'KH03', '30/12/2022', 270000),
+    ('TND2', 'KH03', '30/12/2022', 210000),
+    ('TND2', 'KH04', '31/12/2022', 205000),
+    ('TND3', 'KH06', '31/07/2023', 200000);
+
+
+-- Câu 3: Thực hiện ràng buộc toàn vẹn sau:
+
+-- Số ghế tầng 1 luôn lớn hơn hoặc bằng số ghế tầng 2.
+
+ALTER TABLE XE ADD CONSTRAINT CK_SOGHET CHECK(SOGHET1 >= SOGHET2)
+
+-- Giới tính của khách là “Nam”, “Nữ”.
+
+ALTER TABLE KHACH ADD CONSTRAINT CK_GIOITINH CHECK(GIOITINH IN ('Nam', 'Nữ'))
+
+-- CCCD của các hành khách không trùng nhau.
+
+ALTER TABLE KHACH ADD CONSTRAINT CK_CCCD UNIQUE(CCCD)
+
+-- Giá vé phải lớn hơn hoặc bằng giá vé thông thường.
+
+CREATE TRIGGER TR_GIAVE 
+ON VEXE
+AFTER INSERT, UPDATE 
+AS 
+BEGIN
+    DECLARE @GIAVEXE MONEY
+    DECLARE @GIAVETT MONEY
+    SELECT @GIAVEXE = GIAVE, @GIAVETT = GIATUYEN FROM INSERTED, TUYEN WHERE INSERTED.MATUYEN = TUYEN.MATUYEN
+    IF @GIAVEXE < @GIAVETT
+        BEGIN
+            ROLLBACK TRANSACTION
+            PRINT('Giá vé phải lớn hơn hoặc bằng giá vé thông thường')
+        END
+    ELSE
+        PRINT('Giá vé hợp lệ')
+END
+
+CREATE TRIGGER TR_GIATUYEN
+ON TUYEN
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    DECLARE @GIAVEXE MONEY
+    DECLARE @GIAVETT MONEY
+    SELECT @GIAVEXE = GIAVE, @GIAVETT = GIATUYEN FROM INSERTED, VEXE WHERE INSERTED.MATUYEN = VEXE.MATUYEN
+    IF @GIAVETT > @GIAVEXE
+        BEGIN
+            ROLLBACK TRANSACTION
+            PRINT('Giá vé thông thường phải nhỏ hơn giá vé')
+        END
+    ELSE
+        PRINT('Giá vé hợp lệ')
+END
+
+-- Câu 4: Tìm tất cả các tuyến xuất bến trong tháng 8/2023, sắp xếp kết quả tăng dần theo giá tuyến.
+
+SELECT * FROM TUYEN WHERE (MONTH(NGXB) = 8 AND YEAR(NGXB) = 2023) ORDER BY GIATUYEN ASC
+
+-- Câu 5: Tìm nữ hành khách chưa từng mua vé xe trong năm 2022 
+
+SELECT * FROM KHACH WHERE GIOITINH = 'Nữ' AND MAHK NOT IN (SELECT MAHK FROM VEXE WHERE YEAR(NGMUA) = 2022)
+
+-- Câu 6: Tìm hành khách mua nhiều vé xe nhất trong năm 2023
+
+SELECT MAHK, TENHK, GIOITINH, CCCD FROM
+(
+	SELECT VEXE.MAHK, TENHK, GIOITINH, CCCD, RANK() OVER (ORDER BY COUNT(*) DESC) RANK_SOLANMUA FROM VEXE JOIN KHACH ON VEXE.MAHK = KHACH.MAHK
+	WHERE YEAR(NGMUA) = 2023
+	GROUP BY VEXE.MAHK, TENHK, GIOITINH, CCCD
+) A
+WHERE RANK_SOLANMUA = 1
+
+-- Câu 7: Tìm hành khách đã từng mua vé tất cả các tuyến xe trong năm 2022
+
+SELECT KHACH.MAHK, TENHK, GIOITINH, CCCD FROM KHACH, VEXE WHERE KHACH.MAHK = VEXE.MAHK AND YEAR(NGMUA) = 2022 GROUP BY KHACH.MAHK, TENHK, GIOITINH, CCCD HAVING COUNT(DISTINCT MATUYEN) = (SELECT COUNT(*) FROM TUYEN)
